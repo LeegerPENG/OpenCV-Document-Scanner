@@ -1,13 +1,28 @@
+"""
+This is an example to show how to build cross-GUI applications using
+matplotlib event handling to interact with objects on the canvas
+
+"""
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.artist import Artist
 from matplotlib.mlab import dist_point_to_segment
 
-#matplotlib2.0.2
 
 class PolygonInteractor(object):
     """
-    An polygon editor
+    An polygon editor.
+
+    Key-bindings
+
+      't' toggle vertex markers on and off.  When vertex markers are on,
+          you can move them, delete them
+
+      'd' delete the vertex under point
+
+      'i' insert a vertex at point.  You must be within epsilon of the
+          line connecting two existing vertices
+
     """
 
     showverts = True
@@ -23,18 +38,17 @@ class PolygonInteractor(object):
         x, y = zip(*self.poly.xy)
         self.line = Line2D(x, y, marker='o', markerfacecolor='r', animated=True)
         self.ax.add_line(self.line)
+        #self._update_line(poly)
 
         cid = self.poly.add_callback(self.poly_changed)
         self._ind = None  # the active vert
 
         canvas.mpl_connect('draw_event', self.draw_callback)
         canvas.mpl_connect('button_press_event', self.button_press_callback)
+        canvas.mpl_connect('key_press_event', self.key_press_callback)
         canvas.mpl_connect('button_release_event', self.button_release_callback)
         canvas.mpl_connect('motion_notify_event', self.motion_notify_callback)
         self.canvas = canvas
-
-    def get_poly_points(self):
-        return np.asarray(self.poly.xy)
 
     def draw_callback(self, event):
         self.background = self.canvas.copy_from_bbox(self.ax.bbox)
@@ -83,6 +97,37 @@ class PolygonInteractor(object):
             return
         self._ind = None
 
+    def key_press_callback(self, event):
+        'whenever a key is pressed'
+        if not event.inaxes:
+            return
+        if event.key == 't':
+            self.showverts = not self.showverts
+            self.line.set_visible(self.showverts)
+            if not self.showverts:
+                self._ind = None
+        elif event.key == 'd':
+            ind = self.get_ind_under_point(event)
+            if ind is not None:
+                self.poly.xy = [tup for i, tup in enumerate(self.poly.xy) if i != ind]
+                self.line.set_data(zip(*self.poly.xy))
+        elif event.key == 'i':
+            xys = self.poly.get_transform().transform(self.poly.xy)
+            p = event.x, event.y  # display coords
+            for i in range(len(xys) - 1):
+                s0 = xys[i]
+                s1 = xys[i + 1]
+                d = dist_point_to_segment(p, s0, s1)
+                if d <= self.epsilon:
+                    self.poly.xy = np.array(
+                        list(self.poly.xy[:i]) +
+                        [(event.xdata, event.ydata)] +
+                        list(self.poly.xy[i:]))
+                    self.line.set_data(zip(*self.poly.xy))
+                    break
+
+        self.canvas.draw()
+
     def motion_notify_callback(self, event):
         'on mouse movement'
         if not self.showverts:
@@ -106,3 +151,26 @@ class PolygonInteractor(object):
         self.ax.draw_artist(self.poly)
         self.ax.draw_artist(self.line)
         self.canvas.blit(self.ax.bbox)
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Polygon
+
+    theta = np.arange(0, 2*np.pi, 0.1)
+    r = 1.5
+
+    xs = r*np.cos(theta)
+    ys = r*np.sin(theta)
+
+    poly = Polygon(list(zip(xs, ys)), animated=True)
+
+    fig, ax = plt.subplots()
+    ax.add_patch(poly)
+    p = PolygonInteractor(ax, poly)
+
+    #ax.add_line(p.line)
+    ax.set_title('Click and drag a point to move it')
+    ax.set_xlim((-2, 2))
+    ax.set_ylim((-2, 2))
+    plt.show()
