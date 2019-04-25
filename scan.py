@@ -21,6 +21,11 @@ import cv2
 import argparse
 import os
 
+from PIL import Image
+from PIL import ImageEnhance
+import histogram_equalization
+import contract_enhance
+
 class DocScanner(object):
     """An image scanner"""
 
@@ -272,11 +277,13 @@ class DocScanner(object):
 
         RESCALED_HEIGHT = 500.0
         OUTPUT_DIR = 'output'
+        SHARPEN_DIR='sharpen'
 
         # load the image and compute the ratio of the old height
         # to the new height, clone it, and resize it
         image = cv2.imread(image_path)
-
+        #image = Image.open(image_path)
+        #img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
         assert(image is not None)
 
         ratio = image.shape[0] / RESCALED_HEIGHT
@@ -293,20 +300,80 @@ class DocScanner(object):
         warped = transform.four_point_transform(orig, screenCnt * ratio)
 
         # convert the warped image to grayscale
-        gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+
         # cv2.imshow("gray", gray)
         # cv2.waitKey(0)
         # sharpen image
             #add two picture with weighted
-        sharpen = cv2.GaussianBlur(gray, (0,0), 3)
-        sharpen = cv2.addWeighted(gray, 1.5, sharpen, -0.5, 0)#render contract
-        # cv2.imshow("sharpen", sharpen)
-        # cv2.waitKey(0)
-        # apply adaptive threshold to get black and white effect
-        thresh = cv2.adaptiveThreshold(sharpen, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 15)
 
-        # save the transformed image
         basename = os.path.basename(image_path)
+
+        #gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+        #thresh = histogram_equalization.histogram_equalization(gray)
+        #sharpen=histogram_equalization.histogram_equalization(warped)
+
+        #sharpen = cv2.cvtColor(sharpen, cv2.COLOR_BGR2GRAY)
+        #image = Image.fromarray(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB))
+
+
+        #image = contract_enhance.contractEnhance(image)
+        #image = contract_enhance.sharpness(image)
+
+        #sharpen = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        #sharpen = cv2.cvtColor(sharpen, cv2.COLOR_BGR2GRAY)
+
+        #gray = histogram_equalization.histogram_equalization(gray)
+
+        #sharpen = cv2.GaussianBlur(gray, (0,0), 3)
+        #sharpen = cv2.addWeighted(gray, 3, sharpen, -2,0)#render contract_enhance.py
+
+        thresh = Image.fromarray(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB))
+
+        #thresh = contract_enhance.contractEnhance(thresh)
+        sharp = contract_enhance.sharpness(thresh)
+
+        sharp = cv2.cvtColor(np.array(sharp), cv2.COLOR_RGB2BGR)
+
+        cv2.imwrite(SHARPEN_DIR + '/' + basename, sharp)
+
+
+
+
+
+        thresh = cv2.cvtColor(sharp, cv2.COLOR_BGR2GRAY)
+
+
+
+        #cv2.imshow("sharpen", sharpen)
+        #cv2.waitKey(0)
+
+
+
+        # apply adaptive threshold to get black and white effect
+        thresh = cv2.adaptiveThreshold(thresh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C , cv2.THRESH_BINARY, 21, 13)
+        #sharp = cv2.cvtColor(sharp, cv2.COLOR_BGR2GRAY)
+        #gray = cv2.GaussianBlur(gray, (0, 0), 3)
+        #thresh = cv2.addWeighted(sharp, -0.5, thresh, 1.5, 10)  # render contract_enhance.py
+        #thresh = cv2.GaussianBlur(thresh, (0, 0), 3)
+
+        #thresh = cv2.adaptiveThreshold(thresh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 5, 5)
+        #thresh = cv2.adaptiveThreshold(thresh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 9, 3)
+        #thresh =cv2.medianBlur(thresh,3)
+        thresh =cv2.blur(thresh,(3,3))
+        #thresh=cv2.fastNlMeansDenoising(thresh,None,9,13)
+        #膨胀
+        #kernel = np.ones((5, 5), np.uint8)
+        #thresh = cv2.dilate(thresh, kernel, iterations=1)
+
+        # 开运算
+        #kernel = np.ones((5, 5), np.uint8)
+        #thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+
+        #闭运算
+        #kernel = np.ones((21, 21), np.uint8)
+        #thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+        # save the transformed image
+
         cv2.imwrite(OUTPUT_DIR + '/' + basename, thresh)
         print("Proccessed " + basename)
 
